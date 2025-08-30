@@ -11,6 +11,10 @@ namespace DataMigrator.App
     {
         private MySqlMigrator? _migrator;
         private CancellationTokenSource? _cts;
+        /// <summary>
+        /// 配置文件路径
+        /// </summary>
+        private string ConfigPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "migration_config.json");
         public FrmMain()
         {
             InitializeComponent();
@@ -328,7 +332,7 @@ namespace DataMigrator.App
                 };
 
                 var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync("migration_config.json", json);
+                await File.WriteAllTextAsync(ConfigPath, json);
                 UpdateUIControl(this, () =>
                 {
                     MessageBox.Show("配置保存成功!", "保存配置", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -343,21 +347,50 @@ namespace DataMigrator.App
         /// <summary>
         /// 从文件加载配置
         /// </summary>
-        private void LoadConfiguration()
+        private async void LoadConfiguration()
         {
             try
             {
-                if (!File.Exists("migration_config.json"))
+                if (!File.Exists(ConfigPath))
                 {
                     MessageBox.Show("配置文件不存在!", "加载配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                var json = File.ReadAllText("migration_config.json");
-                var config = JsonSerializer.Deserialize<dynamic>(json);
-
+                var json = await File.ReadAllTextAsync(ConfigPath);
+                var config = JsonSerializer.Deserialize<MigrationUIConfig>(json);
+                if (config == null)
+                {
+                    MessageBox.Show("配置文件格式错误!", "加载配置", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
                 // 更新UI控件（这里需要根据实际JSON结构进行调整）
                 // 示例: txtSourceServer.Text = config.SourceServer;
+
+                txtSourceServer.Text = config.SourceServer ?? string.Empty;
+                txtSourceDatabase.Text = config.SourceDatabase ?? string.Empty;
+                txtSourceUserId.Text = config.SourceUserId ?? string.Empty;
+                txtSourcePassword.Text = config.SourcePassword ?? string.Empty;
+                txtBackupServer.Text = config.BackupServer ?? string.Empty;
+                txtBackupDatabase.Text = config.BackupDatabase ?? string.Empty;
+                txtBackupUserId.Text = config.BackupUserId ?? string.Empty;
+                txtBackupPassword.Text = config.BackupPassword ?? string.Empty;
+                nudKeepDays.Value = config.KeepDays;
+                nudBatchSize.Value = config.BatchSize;
+                chkDeleteAfterMigration.Checked = config.DeleteAfterMigration;
+                // 重新加载表列表
+                await RefreshTableListAsync();
+                if (config.SelectedTables != null)
+                {
+                    for (int i = 0; i < clbTables.Items.Count; i++)
+                    {
+                        var item = clbTables.Items[i].ToString();
+                        if (item != null && config.SelectedTables.Contains(item))
+                        {
+                            clbTables.SetItemChecked(i, true);
+                        }
+                    }
+                }
 
                 MessageBox.Show("配置加载成功!", "加载配置", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -682,6 +715,11 @@ namespace DataMigrator.App
                 return true;
 
             return false;
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

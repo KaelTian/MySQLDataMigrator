@@ -58,6 +58,7 @@
             btnSelectAll = new Button();
             clbTables = new CheckedListBox();
             tabPageAdvanced = new TabPage();
+            label1 = new Label();
             btnLoadConfig = new Button();
             btnSaveConfig = new Button();
             chkDeleteAfterMigration = new CheckBox();
@@ -397,6 +398,7 @@
             // 
             // tabPageAdvanced
             // 
+            tabPageAdvanced.Controls.Add(label1);
             tabPageAdvanced.Controls.Add(btnLoadConfig);
             tabPageAdvanced.Controls.Add(btnSaveConfig);
             tabPageAdvanced.Controls.Add(chkDeleteAfterMigration);
@@ -413,9 +415,19 @@
             tabPageAdvanced.Text = "高级设置";
             tabPageAdvanced.UseVisualStyleBackColor = true;
             // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Location = new Point(260, 317);
+            label1.Name = "label1";
+            label1.Size = new Size(451, 24);
+            label1.TabIndex = 14;
+            label1.Text = "路径为Tool运行目录下的 'migration_config.json' 文件";
+            label1.Click += label1_Click;
+            // 
             // btnLoadConfig
             // 
-            btnLoadConfig.Location = new Point(740, 112);
+            btnLoadConfig.Location = new Point(260, 364);
             btnLoadConfig.Name = "btnLoadConfig";
             btnLoadConfig.Size = new Size(115, 42);
             btnLoadConfig.TabIndex = 13;
@@ -425,7 +437,7 @@
             // 
             // btnSaveConfig
             // 
-            btnSaveConfig.Location = new Point(740, 26);
+            btnSaveConfig.Location = new Point(260, 254);
             btnSaveConfig.Name = "btnSaveConfig";
             btnSaveConfig.Size = new Size(115, 42);
             btnSaveConfig.TabIndex = 12;
@@ -436,7 +448,7 @@
             // chkDeleteAfterMigration
             // 
             chkDeleteAfterMigration.AutoSize = true;
-            chkDeleteAfterMigration.Location = new Point(260, 206);
+            chkDeleteAfterMigration.Location = new Point(260, 192);
             chkDeleteAfterMigration.Name = "chkDeleteAfterMigration";
             chkDeleteAfterMigration.Size = new Size(176, 28);
             chkDeleteAfterMigration.TabIndex = 5;
@@ -610,5 +622,6 @@
         private Button btnLoadConfig;
         private Button btnSaveConfig;
         private Button btnCancelMigration;
+        private Label label1;
     }
 }
