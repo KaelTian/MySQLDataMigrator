@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySQLDataMigrator", "MySQLDataMigrator\MySQLDataMigrator.csproj", "{331F13FE-0936-48D7-A8B0-356CF56F769E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataMigrator.Service", "DataMigrator.Service\DataMigrator.Service.csproj", "{C560BEF9-84A1-4BA8-9C21-37CD759500A6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DataMigrator.App", "DataMigrator.App\DataMigrator.App.csproj", "{0F0270B3-513F-4203-B9A8-16F82286C04A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{331F13FE-0936-48D7-A8B0-356CF56F769E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{331F13FE-0936-48D7-A8B0-356CF56F769E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{331F13FE-0936-48D7-A8B0-356CF56F769E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{331F13FE-0936-48D7-A8B0-356CF56F769E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C560BEF9-84A1-4BA8-9C21-37CD759500A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C560BEF9-84A1-4BA8-9C21-37CD759500A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C560BEF9-84A1-4BA8-9C21-37CD759500A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C560BEF9-84A1-4BA8-9C21-37CD759500A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F0270B3-513F-4203-B9A8-16F82286C04A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F0270B3-513F-4203-B9A8-16F82286C04A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F0270B3-513F-4203-B9A8-16F82286C04A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F0270B3-513F-4203-B9A8-16F82286C04A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
