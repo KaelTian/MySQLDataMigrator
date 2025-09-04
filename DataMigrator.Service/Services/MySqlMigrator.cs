@@ -102,17 +102,15 @@ namespace DataMigrator.Service.Services
                             results.Add(result);
                             continue;
                         }
-                        //// 4. 批量迁移数据
-                        //var migratedCount = await MigrateRecordsAsync(tableName, cutoffTime, countToMigrate, cancellationToken);
+                        // 4. 批量迁移数据
+                        var migratedCount = await MigrateTableAsync(tableName, cutoffTime, countToMigrate, cancellationToken);
 
-                        //// 5. 迁移成功后删除源库数据
-                        //long deletedCount = 0;
-                        //if (_config.DeleteAfterMigration && migratedCount > 0)
-                        //{
-                        //    deletedCount = await DeleteMigratedRecordsAsync(tableName, cutoffTime, migratedCount, cancellationToken);
-                        //}
-
-                        (var migratedCount, var deletedCount) = await MigrateTableWithReaderAsync(tableName, cutoffTime, countToMigrate, cancellationToken);
+                        // 5. 迁移成功后删除源库数据
+                        long deletedCount = 0;
+                        if (_config.DeleteAfterMigration && migratedCount > 0)
+                        {
+                            deletedCount = await DeleteMigratedRecordsAsync(tableName, cutoffTime, migratedCount, cancellationToken);
+                        }
 
                         result.Success = true;
                         result.MigratedCount = migratedCount;
@@ -158,39 +156,24 @@ namespace DataMigrator.Service.Services
             }
             return results;
         }
-
-        #region Migrate table with reader.
-        /// <summary>
-        /// 使用 MySqlDataReader 和 MySqlBulkCopy 批量迁移数据
-        /// </summary>
-        /// <param name="tableName"></param>
-        /// <param name="cutoffTime"></param>
-        /// <param name="totalCount"></param>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
-        private async Task<(long totalMigrated, long totalDeleted)> MigrateTableWithReaderAsync(
-            string tableName,
-            DateTime cutoffTime,
-            long totalCount, CancellationToken cancellationToken)
+        private async Task<long> MigrateTableAsync(string tableName, DateTime cutoffTime, long totalCount, CancellationToken cancellationToken)
         {
             long totalMigrated = 0;
-            long totalDeleted = 0;
 
-            if (totalCount <= 0) return (totalMigrated, totalDeleted);
+            if (totalCount <= 0) return totalMigrated;
             var batchCount = (int)Math.Ceiling((double)totalCount / _config.BatchSize);
 
             for (int batchIndex = 0; batchIndex < batchCount; batchIndex++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 1. 打开源库连接
                 using var sourceConn = new MySqlConnection(_config.SourceConnectionString);
                 await sourceConn.OpenAsync(cancellationToken);
 
                 var sql = $@"SELECT * FROM `{tableName}` 
-                         WHERE `{_config.TimeColumnName}` < @CutoffTime 
-                         ORDER BY `{_config.TimeColumnName}` ASC 
-                         LIMIT @Offset, @BatchSize";
+                     WHERE `{_config.TimeColumnName}` < @CutoffTime 
+                     ORDER BY `{_config.TimeColumnName}` ASC 
+                     LIMIT @Offset, @BatchSize";
 
                 using var cmd = new MySqlCommand(sql, sourceConn);
                 cmd.Parameters.AddWithValue("@CutoffTime", cutoffTime);
@@ -198,13 +181,8 @@ namespace DataMigrator.Service.Services
                 cmd.Parameters.AddWithValue("@BatchSize", _config.BatchSize);
 
                 using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+                if (!reader.HasRows) break;
 
-                if (!reader.HasRows)
-                {
-                    break;
-                }
-
-                // 2. 打开目标库连接
                 using var destConn = new MySqlConnection(_config.BackupConnectionString);
                 await destConn.OpenAsync(cancellationToken);
 
@@ -214,12 +192,7 @@ namespace DataMigrator.Service.Services
                     BulkCopyTimeout = 0,
                     NotifyAfter = 10000
                 };
-                bulkCopy.MySqlRowsCopied += (sender, e) =>
-                {
-                    // 可选 to do ：触发进度事件
-                    //BulkCopyProgress?.Invoke(this, (TableName: tableName, RowsCopied: e.RowsCopied));
-                };
-                // 3. 列映射一次构建即可
+
                 for (int i = 0; i < reader.FieldCount; i++)
                 {
                     bulkCopy.ColumnMappings.Add(new MySqlBulkCopyColumnMapping
@@ -229,32 +202,48 @@ namespace DataMigrator.Service.Services
                     });
                 }
 
-                // 4. 执行批量写入
                 var result = await bulkCopy.WriteToServerAsync(reader, cancellationToken);
                 int rowsCopied = result?.RowsInserted ?? 0;
 
-                // 5. 删除源数据（按 batch）
-                if (_config.DeleteAfterMigration && rowsCopied > 0)
-                {
-                    long deleted = await DeleteMigratedRecordsAsync(tableName, cutoffTime, rowsCopied, cancellationToken);
-                    totalDeleted += deleted;
-                }
-
                 totalMigrated += rowsCopied;
                 currentMigratedCount += rowsCopied;
-                // 触发【批量迁移进度】事件（告知当前批次进度）
+
                 BatchMigrationProgress?.Invoke(this, (
                     TableName: tableName,
-                    CurrentBatch: batchIndex + 1, // 批次从1开始显示
+                    CurrentBatch: batchIndex + 1,
                     TotalBatches: batchCount,
                     MigratedSoFar: totalMigrated,
                     TotalToMigrate: totalCount
                 ));
             }
 
-            return (totalMigrated, totalDeleted);
+            return totalMigrated;
         }
-        #endregion
+        private async Task<long> DeleteTableDataAsync(string tableName, DateTime cutoffTime, CancellationToken cancellationToken)
+        {
+            long totalDeleted = 0;
+            int deleted;
+
+            do
+            {
+                using var conn = new MySqlConnection(_config.SourceConnectionString);
+                await conn.OpenAsync(cancellationToken);
+
+                var sql = $@"DELETE FROM `{tableName}`
+                     WHERE `{_config.TimeColumnName}` < @CutoffTime
+                     LIMIT @BatchSize;";
+
+                using var cmd = new MySqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@CutoffTime", cutoffTime);
+                cmd.Parameters.AddWithValue("@BatchSize", _config.BatchSize);
+
+                deleted = await cmd.ExecuteNonQueryAsync(cancellationToken);
+                totalDeleted += deleted;
+
+            } while (deleted > 0);
+
+            return totalDeleted;
+        }
         /// <summary>
         /// 批量迁移记录
         /// </summary>
@@ -429,9 +418,7 @@ namespace DataMigrator.Service.Services
             var cnt = Convert.ToInt32(await cmd.ExecuteScalarAsync());
             return cnt > 0;
         }
-
         // --- helpers ---
-
         private static string GetSimpleTableName(string fullName)
         {
             // accept "schema.table" or "table"; returns last segment
@@ -439,14 +426,12 @@ namespace DataMigrator.Service.Services
             var parts = fullName.Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
             return parts[^1];
         }
-
         private static string QuoteIdentifier(string identifier)
         {
             if (identifier is null) throw new ArgumentNullException(nameof(identifier));
             // double any backticks inside name and wrap with backticks
             return $"`{identifier.Replace("`", "``")}`";
         }
-
         private static string QuoteFullIdentifier(string full)
         {
             if (string.IsNullOrEmpty(full)) throw new ArgumentNullException(nameof(full));
@@ -455,7 +440,6 @@ namespace DataMigrator.Service.Services
                 parts[i] = QuoteIdentifier(parts[i]);
             return string.Join(".", parts);
         }
-
         private static string RemoveAutoIncrementValue(string sql)
         {
             if (string.IsNullOrEmpty(sql)) return sql;
@@ -463,7 +447,6 @@ namespace DataMigrator.Service.Services
             sql = Regex.Replace(sql, @"AUTO_INCREMENT\s*=\s*\d+\s*", "", RegexOptions.IgnoreCase);
             return sql;
         }
-
         private static string RemoveDefiner(string sql)
         {
             if (string.IsNullOrEmpty(sql)) return sql;
@@ -473,7 +456,6 @@ namespace DataMigrator.Service.Services
             sql = Regex.Replace(sql, @"\s{2,}", " ");
             return sql;
         }
-
         private static string NormalizeCreateTableHeaderToTarget(string createSql, string targetTableOnly)
         {
             if (string.IsNullOrEmpty(createSql)) return createSql;
@@ -573,7 +555,6 @@ namespace DataMigrator.Service.Services
             var result = await command.ExecuteScalarAsync();
             return result != null ? Convert.ToInt64(result) : 0;
         }
-
         /// <summary>
         /// 统一插入入口：小数据量用原有参数化插入，大数据量用CSV BulkLoad
         /// </summary>
